@@ -1,12 +1,23 @@
-# For our emacs users
-*~
+# built application files
+*.apk
+*.ap_
 
-# All generated files will be in target thanks to the use of maven
-target/
+# files for the dex VM
+*.dex
 
-# for eclipse users
+# Java class files
+*.class
+
+# generated files
+bin/
+gen/
+
+# Local configuration file (sdk path, etc)
+local.properties
+
+# Eclipse project files
 .classpath
-.DS_Store
-.project
-.settings
 .project/
+.DS_Store
+.settings
+.project
