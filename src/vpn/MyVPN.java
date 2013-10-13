@@ -40,6 +40,7 @@ public class MyVPN implements Runnable {
 	public static final int AUTHENICATING = 4;
 	public static int status = DISCONNECTED;
 	public static boolean isHost = false;
+	public static boolean isConButPressed = false;
 	
 	// TCP components
 	public static ServerSocket hostServer = null;
@@ -82,6 +83,7 @@ public class MyVPN implements Runnable {
 				if(msg != null && msg.length() != 0) {
 					sendMessage(msg);
 					logArea.append("OUT: " + msg + "\n");
+					sendDataField.setText("");
 				}
 			}
 		}
@@ -128,6 +130,7 @@ public class MyVPN implements Runnable {
 		JPanel pinPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
 		pinPanel.add(new JLabel("PIN       :"));
 		pinField = new JTextField(TEXTFIELDSIZE); 
+		pinField.setText("hahahaa");
 		pinPanel.add(pinField);
 		optPanel.add(pinPanel);
 		
@@ -145,7 +148,7 @@ public class MyVPN implements Runnable {
 			@Override
 			public void actionPerformed(ActionEvent e) {
 				doDisconnected();
-				terminate();
+				terminate("Disconnected\nBye Bye");
 			}
 		}
 		
@@ -168,7 +171,7 @@ public class MyVPN implements Runnable {
 				clientButton.setEnabled(false);
 				contButton.setEnabled(true);
 				disconnectButton.setEnabled(true);
-				statusLabel.setText("I am a server!");
+				statusLabel.setText("Waiting for client");
 				status = CREATINGSERVER;
 			}
 		}
@@ -180,7 +183,7 @@ public class MyVPN implements Runnable {
 				clientButton.setEnabled(false);
 				contButton.setEnabled(true);
 				disconnectButton.setEnabled(true);
-				statusLabel.setText("I am a client!");
+				statusLabel.setText("Finding server");
 				status = WAITINGSERVER;
 			}
 		}
@@ -202,7 +205,7 @@ public class MyVPN implements Runnable {
 		class ContinueButtonListener implements ActionListener {
 			@Override
 			public void actionPerformed(ActionEvent e) {
-				status = CONNECTED;
+				isConButPressed = true;
 			}
 		}
 		
@@ -279,7 +282,6 @@ public class MyVPN implements Runnable {
 	}
 	
 	public static boolean connectAsClient() {
-		//TODO authentication
 		try {
 			isHost = false;
 			socket = new Socket(ipField.getText(), Integer.parseInt(portField.getText()));
@@ -297,8 +299,8 @@ public class MyVPN implements Runnable {
 		return true;
 	}
 	
-	public static void terminate() {
-		JOptionPane.showMessageDialog(null, "Disconnected\nBye Bye");
+	public static void terminate(String msg) {
+		JOptionPane.showMessageDialog(null, msg);
 		mainFrame.setVisible(false);
 		System.exit(0);
 	}
@@ -320,11 +322,72 @@ public class MyVPN implements Runnable {
 		return msg;
 	}
 	
-	public static boolean doAuthenication(boolean isHost) {
+	public static void doAuthenication(boolean isHost) {
 		//TODO
-		
-		
-		return true;
+		boolean hasMsg = false;
+		if(isHost) {
+			while(!hasMsg) {
+				// wait for Alice
+				String msg = readMessage();
+				if(msg != null && msg.length() != 0) {
+					waitForContinue();
+					logArea.append("IN:" + msg + "\n");	
+					if(msg.equals("I'm Alice")) {
+						waitForContinue();
+						// send "Bob"
+						sendMessage("Bob");
+						logArea.append("OUT:" + "Bob" + "\n");	
+						hasMsg = true;
+					}
+					else {
+						terminate("not Alice 1");
+					}
+				}
+			}
+			hasMsg = false;
+			while(!hasMsg) {
+				// wait for 3rd line
+				String msg = readMessage();
+				if(msg != null && msg.length() != 0) {
+					waitForContinue();
+					logArea.append("IN:" + msg + "\n");	
+					if(msg.equals("Alice")) {
+						hasMsg = true;
+						logArea.append("This is Alice\n");
+					}
+					else {
+						terminate("not Alice 3");
+					}
+				}
+			}
+		}
+		else {
+			waitForContinue();
+			sendMessage("I'm Alice");
+			logArea.append("OUT:" + "I'm Alice" + "\n");	
+			while(!hasMsg) {
+				String msg = readMessage();
+				if(msg != null && msg.length() != 0) {
+					waitForContinue();
+					logArea.append("IN:" + msg + "\n");	
+					if(msg.equals("Bob")) {
+						waitForContinue();
+						sendMessage("Alice");
+						logArea.append("OUT:" + "Alice" + "\n");	
+						hasMsg = true;
+						logArea.append("This is Bob\n");
+					}
+					else {
+						terminate("not Bob 2");
+					}
+				}
+			}	
+		}
+	}
+	
+	public static void waitForContinue() {
+		while(!isConButPressed);
+		isConButPressed = false;
 	}
 	
 	@Override
@@ -404,7 +467,17 @@ public class MyVPN implements Runnable {
 				}
 			}
 			else if(status == AUTHENICATING) {
-				statusLabel.setText("AUTHENICATING");
+				if(isHost)
+					statusLabel.setText("AUTHENICATING - Server side");
+				else
+					statusLabel.setText("AUTHENICATING - Client side");
+				mainFrame.repaint();
+				doAuthenication(isHost);
+				status = CONNECTED;
+				if(isHost)
+					statusLabel.setText("I am Server(Bob)!");
+				else
+					statusLabel.setText("I am Client(Alice)!");
 			}
 			else if(status == CONNECTED) {
 				// read
@@ -414,7 +487,7 @@ public class MyVPN implements Runnable {
 //						logArea.append("IN:" + msg + "\n");	
 //				}
 				String msg = readMessage();
-				if(msg != null && msg.length() != 0)
+				if(msg != null && msg.length() != 0) 
 					logArea.append("IN:" + msg + "\n");	
 			}
 			
