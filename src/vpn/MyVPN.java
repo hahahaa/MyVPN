@@ -5,9 +5,7 @@ import java.awt.FlowLayout;
 import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.ConnectException;
 import java.net.ServerSocket;
@@ -18,6 +16,7 @@ import java.util.Scanner;
 import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
@@ -38,7 +37,9 @@ public class MyVPN implements Runnable {
 	public static final int CREATINGSERVER = 1;
 	public static final int WAITINGSERVER = 2;
 	public static final int CONNECTED = 3;
+	public static final int AUTHENICATING = 4;
 	public static int status = DISCONNECTED;
+	public static boolean isHost = false;
 	
 	// TCP components
 	public static ServerSocket hostServer = null;
@@ -79,9 +80,8 @@ public class MyVPN implements Runnable {
 			public void actionPerformed(ActionEvent e) {
 				String msg = sendDataField.getText();
 				if(msg != null && msg.length() != 0) {
-					msg = msg + "\n";
-					out.print(msg);
-					out.flush();
+					sendMessage(msg);
+					logArea.append("OUT: " + msg + "\n");
 				}
 			}
 		}
@@ -101,7 +101,7 @@ public class MyVPN implements Runnable {
 		sendPanel.add(sendDataField);
 		sendPanel.add(sendButton);
 		logPanel.add(sendPanel, BorderLayout.NORTH);
-		logPanel.add(logArea, BorderLayout.CENTER);
+		logPanel.add(scrollingTextArea, BorderLayout.CENTER);
 		
 		//-------------------------------------------------------------
 		// set up option panel
@@ -140,6 +140,18 @@ public class MyVPN implements Runnable {
 		// disconnect button
 		JPanel buttonPanel3 = new JPanel(new GridLayout(1, 1));
 		disconnectButton = new JButton("Disconnect");
+		
+		class DiscButtonListener implements ActionListener {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				doDisconnected();
+				terminate();
+			}
+		}
+		
+		ActionListener discButListener = new DiscButtonListener();
+		disconnectButton.addActionListener(discButListener);
+		
 		disconnectButton.setEnabled(false);
 		buttonPanel3.add(disconnectButton);
 		optPanel.add(buttonPanel3);
@@ -186,6 +198,17 @@ public class MyVPN implements Runnable {
 		// continue button
 		JPanel buttonPanel2 = new JPanel(new GridLayout(1, 1));
 		contButton = new JButton("Continue");
+		
+		class ContinueButtonListener implements ActionListener {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				status = CONNECTED;
+			}
+		}
+		
+		ActionListener contButListener = new ContinueButtonListener();
+		contButton.addActionListener(contButListener);
+		
 		contButton.setEnabled(false);
 		buttonPanel2.add(contButton);
 		optPanel.add(buttonPanel2);
@@ -214,20 +237,31 @@ public class MyVPN implements Runnable {
 	}
 	
 	public static void doDisconnected() {
-		//TODO not sure if it is done
 		try {
-			if(in != null)
-				in.close();
-			if(out != null) {
-				out.flush();
-				out.close();
+			if (hostServer != null) {
+				hostServer.close();
+				hostServer = null;
 			}
-			if(hostServer != null)
-				hostServer.close();	
-			if(socket != null)
+		}
+		catch (IOException e) { 
+			hostServer = null; 
+		}	
+		try {
+			if (socket != null) {
 				socket.close();
-		} catch (IOException e) {
-			e.printStackTrace();
+				socket = null;
+			}
+		}
+		catch (IOException e) { 
+			socket = null; 
+		}	
+		if (in != null) {
+			in.close();
+			in = null;
+		}		
+		if (out != null) {
+			out.close();
+			out = null;
 		}
 	}
 	
@@ -237,6 +271,7 @@ public class MyVPN implements Runnable {
 			logArea.append("Server: Waiting for a client......\n");
 			socket = hostServer.accept();
 			logArea.append("Server: Client connected\n");
+			isHost = true;
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
@@ -246,6 +281,7 @@ public class MyVPN implements Runnable {
 	public static boolean connectAsClient() {
 		//TODO authentication
 		try {
+			isHost = false;
 			socket = new Socket(ipField.getText(), Integer.parseInt(portField.getText()));
 		} catch (ConnectException e) {
 			e.printStackTrace();
@@ -260,7 +296,37 @@ public class MyVPN implements Runnable {
 		}
 		return true;
 	}
-			
+	
+	public static void terminate() {
+		JOptionPane.showMessageDialog(null, "Disconnected\nBye Bye");
+		mainFrame.setVisible(false);
+		System.exit(0);
+	}
+	
+	public static void sendMessage(String msg) {
+		msg = msg + "\n";
+		out.print(msg);
+		out.flush();
+	}
+	
+	public static String readMessage() {
+		String msg = null;
+		while(in.hasNext()) {
+			msg = in.nextLine();
+//			if(msg != null && msg.length() != 0)
+//				logArea.append("IN :" + msg + "\n");
+			return msg;
+		}
+		return msg;
+	}
+	
+	public static boolean doAuthenication(boolean isHost) {
+		//TODO
+		
+		
+		return true;
+	}
+	
 	@Override
 	public void run() {
 		if(status == DISCONNECTED) {
@@ -284,6 +350,13 @@ public class MyVPN implements Runnable {
 			clientButton.setEnabled(false);
 			sendButton.setEnabled(false);
 		}
+		else if(status == AUTHENICATING) {
+			disconnectButton.setEnabled(true);
+			contButton.setEnabled(true);
+			serverButton.setEnabled(false);
+			clientButton.setEnabled(false);
+			sendButton.setEnabled(false);
+		}
 		else if(status == CONNECTED) {
 			disconnectButton.setEnabled(true);
 			contButton.setEnabled(true);
@@ -292,21 +365,21 @@ public class MyVPN implements Runnable {
 			sendButton.setEnabled(true);
 		}
 		
-		//mainFrame.repaint();
+		mainFrame.repaint();
 	}
 	
 	public static void main(String args[]) {
 		initGUI();
 		
 		int prevStatus = -1;
-		while(true) {
+		while(true) {		
 			prevStatus = status;
 			if(status == DISCONNECTED) {
 				doDisconnected();
 			}
 			else if(status == CREATINGSERVER) {
 				creatServer();
-				status = CONNECTED;
+				status = AUTHENICATING;
 				try {
 					in = new Scanner(socket.getInputStream());
 					out = new PrintWriter(socket.getOutputStream(), true);
@@ -317,7 +390,7 @@ public class MyVPN implements Runnable {
 			else if(status == WAITINGSERVER) {
 				if(connectAsClient()) {
 					logArea.append("Client: Connected to server\n");
-					status = CONNECTED;
+					status = AUTHENICATING;
 					try {
 						in = new Scanner(socket.getInputStream());
 						out = new PrintWriter(socket.getOutputStream(), true);
@@ -330,13 +403,19 @@ public class MyVPN implements Runnable {
 					status = DISCONNECTED;
 				}
 			}
+			else if(status == AUTHENICATING) {
+				statusLabel.setText("AUTHENICATING");
+			}
 			else if(status == CONNECTED) {
 				// read
-				while(in.hasNext()) {
-					String msg = in.nextLine();
-					if(msg != null && msg.length() != 0)
-						logArea.append(msg + "\n");	
-				}
+//				while(in.hasNext()) {
+//					String msg = in.nextLine();
+//					if(msg != null && msg.length() != 0)
+//						logArea.append("IN:" + msg + "\n");	
+//				}
+				String msg = readMessage();
+				if(msg != null && msg.length() != 0)
+					logArea.append("IN:" + msg + "\n");	
 			}
 			
 			if(prevStatus != status)
