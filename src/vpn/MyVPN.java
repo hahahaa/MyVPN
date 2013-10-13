@@ -30,6 +30,7 @@ public class MyVPN implements Runnable {
 
 	public static final String HOSTIP = "127.0.0.1";
 	public static final int DEFAULTPORT = 7777;
+	public static final String key = "hahahaha";
 	public static final int TEXTFIELDSIZE = 15;
 	public static final int FRAME_HEIGHT = 500;
 	public static final int FRAME_WIDTH = 800;
@@ -37,10 +38,11 @@ public class MyVPN implements Runnable {
 	public static final int CREATINGSERVER = 1;
 	public static final int WAITINGSERVER = 2;
 	public static final int CONNECTED = 3;
-	public static final int AUTHENICATING = 4;
+	public static final int AUTHENTICATING = 4;
 	public static int status = DISCONNECTED;
 	public static boolean isHost = false;
 	public static boolean isConButPressed = false;
+	public static DESEncoder encoder = null;
 	
 	// TCP components
 	public static ServerSocket hostServer = null;
@@ -130,7 +132,7 @@ public class MyVPN implements Runnable {
 		JPanel pinPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
 		pinPanel.add(new JLabel("PIN       :"));
 		pinField = new JTextField(TEXTFIELDSIZE); 
-		pinField.setText("hahahaa");
+		pinField.setText(key);
 		pinPanel.add(pinField);
 		optPanel.add(pinPanel);
 		
@@ -306,7 +308,9 @@ public class MyVPN implements Runnable {
 	}
 	
 	public static void sendMessage(String msg) {
+		msg = encoder.encrypt(msg);
 		msg = msg + "\n";
+		logArea.append("OUT(ciphertext): " + msg);
 		out.print(msg);
 		out.flush();
 	}
@@ -317,15 +321,18 @@ public class MyVPN implements Runnable {
 			msg = in.nextLine();
 //			if(msg != null && msg.length() != 0)
 //				logArea.append("IN :" + msg + "\n");
+			logArea.append("IN(ciphertext): " + msg + "\n");
+			msg = encoder.decrypt(msg);
 			return msg;
 		}
 		return msg;
 	}
 	
-	public static void doAuthenication(boolean isHost) {
+	public static void doAuthentication(boolean isHost) {
 		//TODO
 		boolean hasMsg = false;
-		if(isHost) {
+		if(isHost) {	
+			// server
 			while(!hasMsg) {
 				// wait for Alice
 				String msg = readMessage();
@@ -353,7 +360,7 @@ public class MyVPN implements Runnable {
 					logArea.append("IN:" + msg + "\n");	
 					if(msg.equals("Alice")) {
 						hasMsg = true;
-						logArea.append("This is Alice\n");
+						logArea.append("Authenticated: This is Alice\n");
 					}
 					else {
 						terminate("not Alice 3");
@@ -362,6 +369,7 @@ public class MyVPN implements Runnable {
 			}
 		}
 		else {
+			// client
 			waitForContinue();
 			sendMessage("I'm Alice");
 			logArea.append("OUT:" + "I'm Alice" + "\n");	
@@ -375,7 +383,7 @@ public class MyVPN implements Runnable {
 						sendMessage("Alice");
 						logArea.append("OUT:" + "Alice" + "\n");	
 						hasMsg = true;
-						logArea.append("This is Bob\n");
+						logArea.append("Authenticated: This is Bob\n");
 					}
 					else {
 						terminate("not Bob 2");
@@ -413,7 +421,7 @@ public class MyVPN implements Runnable {
 			clientButton.setEnabled(false);
 			sendButton.setEnabled(false);
 		}
-		else if(status == AUTHENICATING) {
+		else if(status == AUTHENTICATING) {
 			disconnectButton.setEnabled(true);
 			contButton.setEnabled(true);
 			serverButton.setEnabled(false);
@@ -441,8 +449,9 @@ public class MyVPN implements Runnable {
 				doDisconnected();
 			}
 			else if(status == CREATINGSERVER) {
+				encoder = new DESEncoder(pinField.getText());
 				creatServer();
-				status = AUTHENICATING;
+				status = AUTHENTICATING;
 				try {
 					in = new Scanner(socket.getInputStream());
 					out = new PrintWriter(socket.getOutputStream(), true);
@@ -451,9 +460,10 @@ public class MyVPN implements Runnable {
 				}
 			}
 			else if(status == WAITINGSERVER) {
+				encoder = new DESEncoder(pinField.getText());
 				if(connectAsClient()) {
 					logArea.append("Client: Connected to server\n");
-					status = AUTHENICATING;
+					status = AUTHENTICATING;
 					try {
 						in = new Scanner(socket.getInputStream());
 						out = new PrintWriter(socket.getOutputStream(), true);
@@ -466,13 +476,13 @@ public class MyVPN implements Runnable {
 					status = DISCONNECTED;
 				}
 			}
-			else if(status == AUTHENICATING) {
+			else if(status == AUTHENTICATING) {
 				if(isHost)
-					statusLabel.setText("AUTHENICATING - Server side");
+					statusLabel.setText("AUTHENTICATING - Server side");
 				else
-					statusLabel.setText("AUTHENICATING - Client side");
+					statusLabel.setText("AUTHENTICATING - Client side");
 				mainFrame.repaint();
-				doAuthenication(isHost);
+				doAuthentication(isHost);
 				status = CONNECTED;
 				if(isHost)
 					statusLabel.setText("I am Server(Bob)!");
