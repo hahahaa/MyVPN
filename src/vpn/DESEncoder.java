@@ -18,6 +18,9 @@ public class DESEncoder {
 
 	public DESEncoder (String keyStr) {
 		try {
+			if(keyStr.length() < 8)
+				keyStr = keyStr + "        ";
+			
 			ecipher = Cipher.getInstance("DES");
 			dcipher = Cipher.getInstance("DES");
 
@@ -64,12 +67,15 @@ public class DESEncoder {
 	}
 	
 	public static void main(String argp[]) {
+		// testing
 		String plain = "12345678";
-		DESEncoder d = new DESEncoder("asdashgdjahd");
+		String key = "hahahaha";
+		DESEncoder d = new DESEncoder(key);
 		String encrypt = d.encrypt(plain);
 		String decrypt = d.decrypt(encrypt);
 		
 		System.out.println("plain: " + plain);
+		System.out.println("key: " + key);
 		System.out.println("encrypt: " + encrypt);
 		System.out.println("decrypt: " + decrypt);
 	}
