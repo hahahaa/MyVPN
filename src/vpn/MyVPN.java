@@ -25,10 +25,6 @@ import javax.swing.JTextField;
 import sun.misc.BASE64Decoder;
 import sun.misc.BASE64Encoder;
 
-/**
- * main
- *
- */
 public class MyVPN implements Runnable {
 
 	public static final String HOSTIP = "127.0.0.1";
@@ -46,6 +42,7 @@ public class MyVPN implements Runnable {
 	public static boolean isHost = false;
 	public static boolean isConButPressed = false;
 	public static DESEncoder encoder = null;
+	public static final int MINKEYSIZE = 8;
 	
 	// TCP components
 	public static ServerSocket hostServer = null;
@@ -89,6 +86,7 @@ public class MyVPN implements Runnable {
 					sendMessage(msg);
 					logArea.append("OUT: " + msg + "\n");
 					sendDataField.setText("");
+					sendMessage("msg22222");
 				}
 			}
 		}
@@ -133,7 +131,7 @@ public class MyVPN implements Runnable {
 		
 		// PIN panel
 		JPanel pinPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-		pinPanel.add(new JLabel("PIN       :"));
+		pinPanel.add(new JLabel("Shared key:"));
 		pinField = new JTextField(TEXTFIELDSIZE); 
 		pinField.setText(key);
 		pinPanel.add(pinField);
@@ -172,24 +170,36 @@ public class MyVPN implements Runnable {
 		class ServerButtonListener implements ActionListener {
 			@Override
 			public void actionPerformed(ActionEvent e) {
-				serverButton.setEnabled(false);
-				clientButton.setEnabled(false);
-				contButton.setEnabled(true);
-				disconnectButton.setEnabled(true);
-				statusLabel.setText("Waiting for client");
-				status = CREATINGSERVER;
+				String pin = pinField.getText();
+				if(pin != null && pin.length() >= MINKEYSIZE) {
+					serverButton.setEnabled(false);
+					clientButton.setEnabled(false);
+					contButton.setEnabled(true);
+					disconnectButton.setEnabled(true);
+					statusLabel.setText("Waiting for client");
+					status = CREATINGSERVER;
+				}
+				else {
+					JOptionPane.showMessageDialog(null, "Need at least " + MINKEYSIZE + " characters for the key");
+				}
 			}
 		}
 		
 		class ClientButtonListener implements ActionListener {
 			@Override
 			public void actionPerformed(ActionEvent e) {
-				serverButton.setEnabled(false);
-				clientButton.setEnabled(false);
-				contButton.setEnabled(true);
-				disconnectButton.setEnabled(true);
-				statusLabel.setText("Finding server");
-				status = WAITINGSERVER;
+				String pin = pinField.getText();
+				if(pin != null && pin.length() >= MINKEYSIZE) {
+					serverButton.setEnabled(false);
+					clientButton.setEnabled(false);
+					contButton.setEnabled(true);
+					disconnectButton.setEnabled(true);
+					statusLabel.setText("Finding server");
+					status = WAITINGSERVER;
+				}
+				else {
+					JOptionPane.showMessageDialog(null, "Need at least " + MINKEYSIZE + " characters for the key");
+				}
 			}
 		}
 		
@@ -317,7 +327,7 @@ public class MyVPN implements Runnable {
 		out.print(msg);
 		out.flush();
 	}
-	//Ben
+	
 	public static void sendAuthenticationMessage(String msg){
 		msg = msg + "\n";
 		logArea.append("Authentication Out: " + msg);
@@ -329,27 +339,23 @@ public class MyVPN implements Runnable {
 		String msg = null;
 		while(in.hasNext()) {
 			msg = in.nextLine();
-//			if(msg != null && msg.length() != 0)
-//				logArea.append("IN :" + msg + "\n");
 			logArea.append("IN(ciphertext): " + msg + "\n");
 			msg = encoder.decrypt(msg);
 			return msg;
 		}
 		return msg;
 	}
-	//Ben
+	
 	public static String readAuthenticationMessage(){
 		String msg = null;
 		while(in.hasNext()) {
 			msg = in.nextLine();
-//			if(msg != null && msg.length() != 0)
-//				logArea.append("IN :" + msg + "\n");
 			logArea.append("Authentication In: " + msg + "\n");
 			return msg;
 		}
 		return msg;
 	}
-	//Ben
+	
 	public static void doAuthentication(boolean isHost){
 		boolean hasChallenge_FromClient = false;
 		boolean hasChallenge_FromServer = false;
@@ -387,7 +393,7 @@ public class MyVPN implements Runnable {
 			//generating a encode string using 
 			//the symmetric key, the client's challenge and the server's identity
 			
-			//Xor the ServerID and the challenge and send it back to client for verification
+			//XOR the ServerID and the challenge and send it back to client for verification
 			waitForContinue();
 			sendAuthenticationMessage(encoder.encrypt(XORencode(serverID,clientChallenge)));
 			
@@ -406,7 +412,7 @@ public class MyVPN implements Runnable {
 				logArea.append("The encrypted authentication string is :" + encryptedAuthenStringClient + "\n");
 			}
 			waitForContinue();
-			//decrypted the authentiction string and verify the client's identity
+			//decrypted the authentication string and verify the client's identity
 			if(!XORdecode(encoder.decrypt(encryptedAuthenStringClient),"Cocacola").equals(clientID)){
 				terminate("Fail to verify the client, the program is terminated...");
 			}
@@ -453,9 +459,6 @@ public class MyVPN implements Runnable {
 			if(!XORdecode(encoder.decrypt(encryptedAuthenStringServer),"BubbleTea").equals(serverID)){
 				terminate("Fail to verify the server, the program is terminated...");
 			}
-//			else{
-//				logArea.append("The server's identity is successfully verified...\n");
-//			}
 			
 			//
 			//stage three for client
@@ -498,73 +501,6 @@ public class MyVPN implements Runnable {
 
     }
 	
-	
-	/*
-	public static void doAuthentication(boolean isHost) {
-		//TODO
-		boolean hasMsg = false;
-		if(isHost) {	
-			// server
-			while(!hasMsg) {
-				// wait for Alice
-				String msg = readMessage();
-				if(msg != null && msg.length() != 0) {
-					waitForContinue();
-					logArea.append("IN:" + msg + "\n");	
-					if(msg.equals("I'm Alice")) {
-						waitForContinue();
-						// send "Bob"
-						sendMessage("Bob");
-						logArea.append("OUT:" + "Bob" + "\n");	
-						hasMsg = true;
-					}
-					else {
-						terminate("not Alice 1");
-					}
-				}
-			}
-			hasMsg = false;
-			while(!hasMsg) {
-				// wait for 3rd line
-				String msg = readMessage();
-				if(msg != null && msg.length() != 0) {
-					waitForContinue();
-					logArea.append("IN:" + msg + "\n");	
-					if(msg.equals("Alice")) {
-						hasMsg = true;
-						logArea.append("Authenticated: This is Alice\n");
-					}
-					else {
-						terminate("not Alice 3");
-					}
-				}
-			}
-		}
-		else {
-			// client
-			waitForContinue();
-			sendMessage("I'm Alice");
-			logArea.append("OUT:" + "I'm Alice" + "\n");	
-			while(!hasMsg) {
-				String msg = readMessage();
-				if(msg != null && msg.length() != 0) {
-					waitForContinue();
-					logArea.append("IN:" + msg + "\n");	
-					if(msg.equals("Bob")) {
-						waitForContinue();
-						sendMessage("Alice");
-						logArea.append("OUT:" + "Alice" + "\n");	
-						hasMsg = true;
-						logArea.append("Authenticated: This is Bob\n");
-					}
-					else {
-						terminate("not Bob 2");
-					}
-				}
-			}	
-		}
-	}
-	*/
 	public static void waitForContinue() {
 		while(!isConButPressed);
 		isConButPressed = false;
@@ -578,6 +514,9 @@ public class MyVPN implements Runnable {
 			serverButton.setEnabled(true);
 			clientButton.setEnabled(true);
 			sendButton.setEnabled(false);
+			ipField.setEditable(true);
+			portField.setEditable(true);
+			pinField.setEditable(true);
 		}
 		else if(status == CREATINGSERVER) {
 			disconnectButton.setEnabled(true);
@@ -585,6 +524,9 @@ public class MyVPN implements Runnable {
 			serverButton.setEnabled(false);
 			clientButton.setEnabled(false);
 			sendButton.setEnabled(false);
+			ipField.setEditable(false);
+			portField.setEditable(false);
+			pinField.setEditable(false);
 		}
 		else if(status == WAITINGSERVER) {
 			disconnectButton.setEnabled(true);
@@ -592,6 +534,9 @@ public class MyVPN implements Runnable {
 			serverButton.setEnabled(false);
 			clientButton.setEnabled(false);
 			sendButton.setEnabled(false);
+			ipField.setEditable(false);
+			portField.setEditable(false);
+			pinField.setEditable(false);
 		}
 		else if(status == AUTHENTICATING) {
 			disconnectButton.setEnabled(true);
@@ -599,13 +544,19 @@ public class MyVPN implements Runnable {
 			serverButton.setEnabled(false);
 			clientButton.setEnabled(false);
 			sendButton.setEnabled(false);
+			ipField.setEditable(false);
+			portField.setEditable(false);
+			pinField.setEditable(false);
 		}
 		else if(status == CONNECTED) {
 			disconnectButton.setEnabled(true);
-			contButton.setEnabled(true);
+			contButton.setEnabled(false);
 			serverButton.setEnabled(false);
 			clientButton.setEnabled(false);
 			sendButton.setEnabled(true);
+			ipField.setEditable(false);
+			portField.setEditable(false);
+			pinField.setEditable(false);
 		}
 		
 		mainFrame.repaint();
@@ -662,12 +613,6 @@ public class MyVPN implements Runnable {
 					statusLabel.setText("I am Client(Alice)!");
 			}
 			else if(status == CONNECTED) {
-				// read
-//				while(in.hasNext()) {
-//					String msg = in.nextLine();
-//					if(msg != null && msg.length() != 0)
-//						logArea.append("IN:" + msg + "\n");	
-//				}
 				String msg = readMessage();
 				if(msg != null && msg.length() != 0) 
 					logArea.append("IN:" + msg + "\n");	

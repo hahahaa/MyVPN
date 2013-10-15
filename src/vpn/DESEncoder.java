@@ -16,11 +16,12 @@ public class DESEncoder {
 	private Cipher dcipher;
 	private SecretKey key;
 
+	/**
+	 * Create a DES encoder/decoder with a given key
+	 * @param keyStr Key size needs at least 8 characters
+	 */
 	public DESEncoder (String keyStr) {
-		try {
-			if(keyStr.length() < 8)
-				keyStr = keyStr + "        ";
-			
+		try {			
 			ecipher = Cipher.getInstance("DES");
 			dcipher = Cipher.getInstance("DES");
 
