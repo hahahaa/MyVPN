@@ -22,6 +22,9 @@ import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
 
+import sun.misc.BASE64Decoder;
+import sun.misc.BASE64Encoder;
+
 /**
  * main
  *
@@ -314,6 +317,13 @@ public class MyVPN implements Runnable {
 		out.print(msg);
 		out.flush();
 	}
+	//Ben
+	public static void sendAuthenticationMessage(String msg){
+		msg = msg + "\n";
+		logArea.append("Authentication Out: " + msg);
+		out.print(msg);
+		out.flush();
+	}
 	
 	public static String readMessage() {
 		String msg = null;
@@ -327,7 +337,169 @@ public class MyVPN implements Runnable {
 		}
 		return msg;
 	}
+	//Ben
+	public static String readAuthenticationMessage(){
+		String msg = null;
+		while(in.hasNext()) {
+			msg = in.nextLine();
+//			if(msg != null && msg.length() != 0)
+//				logArea.append("IN :" + msg + "\n");
+			logArea.append("Authentication In: " + msg + "\n");
+			return msg;
+		}
+		return msg;
+	}
+	//Ben
+	public static void doAuthentication(boolean isHost){
+		boolean hasChallenge_FromClient = false;
+		boolean hasChallenge_FromServer = false;
+		boolean hasAuthenString_FromServer = false;
+		boolean hasAuthenString_FromClient = false;
+		String clientChallenge = null;
+		String serverChallenge = null;
+		String encryptedAuthenStringServer = null;
+		String encryptedAuthenStringClient = null;
+		String clientID = "Alice";
+		String serverID = "Bob";
+		int i = 0;
+		//if it's a server
+		if(isHost){
+			//
+			//stage one for server
+			//
+			logArea.append("AuthenticationStage-Server\n");
+			//wait to verify a client
+			while(!hasChallenge_FromClient)
+			{
+				//wait for client to send out a challenge
+				clientChallenge = readAuthenticationMessage();
+				if(i == 1){
+					hasChallenge_FromClient = true;
+					logArea.append("Challenge String Received from Client\n");
+					logArea.append("Challenge String: "+clientChallenge+ "\n");
+				}
+				i++;
+			}
+			
+			//
+			//stage two for server
+			//
+			//generating a encode string using 
+			//the symmetric key, the client's challenge and the server's identity
+			
+			//Xor the ServerID and the challenge and send it back to client for verification
+			waitForContinue();
+			sendAuthenticationMessage(encoder.encrypt(XORencode(serverID,clientChallenge)));
+			
+			//send out a challenge string
+			//the server's challenge can be changed
+			sendAuthenticationMessage("Cocacola");
+			
+			//
+			//stage three for server
+			//
+			//waiting for the authentication string from the client
+			while(!hasAuthenString_FromClient){
+				encryptedAuthenStringClient = readAuthenticationMessage();
+				hasAuthenString_FromClient = true;
+				logArea.append("Received the encrypted authentication string from the client\n");
+				logArea.append("The encrypted authentication string is :" + encryptedAuthenStringClient + "\n");
+			}
+			waitForContinue();
+			//decrypted the authentiction string and verify the client's identity
+			if(!XORdecode(encoder.decrypt(encryptedAuthenStringClient),"Cocacola").equals(clientID)){
+				terminate("Fail to verify the client, the program is terminated...");
+			}
+			else{
+				logArea.append("The client's identity is successfully verified...\n");
+			}
+			
+			
+		}
+		//if its a client
+		else{
+			//
+			//stage one for client
+			//
+			logArea.append("AuthenticationStage-Client\n");
+			//send out first message to claim the client's identity
+			//this string may vary...
+			waitForContinue();
+			sendAuthenticationMessage("I'am Alice");
+			//send out the challenge word to the server
+			//the Client's Challenge can be changed
+			sendAuthenticationMessage("BubbleTea");
+			logArea.append("First Authentication Message Sent\n");
+			
+			//
+			//stage two for client
+			//
+			//waiting for the encrypted authentication string from the server
+			while(!hasAuthenString_FromServer){
+				encryptedAuthenStringServer = readAuthenticationMessage();
+				hasAuthenString_FromServer = true;
+				logArea.append("Received the encrypted authentication string from the server\n");
+				logArea.append("The encrypted authentication string is :" + encryptedAuthenStringServer + "\n");
+			}
+			while(!hasChallenge_FromServer){
+				serverChallenge = readAuthenticationMessage();
+				hasChallenge_FromServer = true;
+				logArea.append("Received the challenge string from the server\n");
+				logArea.append("The challenge string is :" + serverChallenge + "\n");
+				
+			}
+			waitForContinue();
+			//decrypted the authentiction string and verify the server's identity
+			if(!XORdecode(encoder.decrypt(encryptedAuthenStringServer),"BubbleTea").equals(serverID)){
+				terminate("Fail to verify the server, the program is terminated...");
+			}
+//			else{
+//				logArea.append("The server's identity is successfully verified...\n");
+//			}
+			
+			//
+			//stage three for client
+			//
+			//generate a encrypted authentication string to the server
+			sendAuthenticationMessage(encoder.encrypt(XORencode(clientID,serverChallenge)));
+			logArea.append("The server's identity is successfully verified...\n");
+		}
+		
+	}
 	
+	
+	//Ben XOR
+	public static String XORencode(String s, String key) {
+        return base64Encode(xorWithKey(s.getBytes(), key.getBytes()));
+    }
+
+    public static String XORdecode(String s, String key) {
+        return new String(xorWithKey(base64Decode(s), key.getBytes()));
+    }
+
+    private static byte[] xorWithKey(byte[] a, byte[] key) {
+        byte[] out = new byte[a.length];
+        for (int i = 0; i < a.length; i++) {
+            out[i] = (byte) (a[i] ^ key[i%key.length]);
+        }
+        return out;
+    }
+
+    private static byte[] base64Decode(String s) {
+        try {
+            BASE64Decoder d = new BASE64Decoder();
+            return d.decodeBuffer(s);
+        } catch (IOException e) {throw new RuntimeException(e);}
+    }
+
+    private static String base64Encode(byte[] bytes) {
+        BASE64Encoder enc = new BASE64Encoder();
+        return enc.encode(bytes).replaceAll("\\s", "");
+
+    }
+	
+	
+	/*
 	public static void doAuthentication(boolean isHost) {
 		//TODO
 		boolean hasMsg = false;
@@ -392,7 +564,7 @@ public class MyVPN implements Runnable {
 			}	
 		}
 	}
-	
+	*/
 	public static void waitForContinue() {
 		while(!isConButPressed);
 		isConButPressed = false;
