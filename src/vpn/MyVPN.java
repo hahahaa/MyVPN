@@ -510,8 +510,6 @@ public class MyVPN implements Runnable {
 		}
 	}
 
-
-	//Ben XOR
 	public static String XORencode(String s, String key) {
 		return base64Encode(xorWithKey(s.getBytes(), key.getBytes()));
 	}
@@ -546,20 +544,6 @@ public class MyVPN implements Runnable {
 		return key;
 	}
 	
-	//Ben key generator
-	public static int keyGenerator(){
-		int result = 0;
-		Random r = new Random();
-		int min = 2; //inclusive
-		int max = 101; //exclusive
-		int a = r.nextInt(max - min) + min;
-		int b = r.nextInt(max - min) + min;
-		String key = pinField.getText();
-		int keyhash = key.hashCode();
-		result = (int) (((Math.pow(a, b))%keyhash)*8);
-		return result;
-	}
-
 	private static byte[] base64Decode(String s) {
 		try {
 			BASE64Decoder d = new BASE64Decoder();
