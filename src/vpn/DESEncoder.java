@@ -1,10 +1,14 @@
 package vpn;
 
+import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.security.spec.InvalidKeySpecException;
 
+import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
+import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
 import javax.crypto.SecretKeyFactory;
@@ -43,34 +47,38 @@ public class DESEncoder {
 		}
 	}
 
-	public String encrypt(String str) {
-		try {
-		    byte[] utf8 = str.getBytes("UTF8");
-		    byte[] enc = ecipher.doFinal(utf8);
-		    return new sun.misc.BASE64Encoder().encode(enc);
-		}
-		catch (Exception e) {
-			e.printStackTrace();
-		}
+	public String encrypt(String str) throws BadPaddingException {
+		    byte[] utf8;
+			try {
+				utf8 = str.getBytes("UTF8");
+				byte[] enc = ecipher.doFinal(utf8);
+			    return new sun.misc.BASE64Encoder().encode(enc);
+			} catch (UnsupportedEncodingException e) {
+				e.printStackTrace();
+			} catch (IllegalBlockSizeException e) {
+				e.printStackTrace();
+			}
 		return null;
 	}
 
-	public String decrypt(String str) {
-		try {
-		    byte[] dec = new sun.misc.BASE64Decoder().decodeBuffer(str);
-		    byte[] utf8 = dcipher.doFinal(dec);
-		    return new String(utf8, "UTF8");
-		}
-		catch (Exception e) {
-			e.printStackTrace();
-		}
+	public String decrypt(String str) throws BadPaddingException {
+		    byte[] dec;
+			try {
+				dec = new sun.misc.BASE64Decoder().decodeBuffer(str);
+			    byte[] utf8 = dcipher.doFinal(dec);
+			    return new String(utf8, "UTF8");
+			} catch (IOException e) {
+				e.printStackTrace();
+			} catch (IllegalBlockSizeException e) {
+				e.printStackTrace();
+			}	
 		return null;
 	}
 	
-	public static void main(String argp[]) {
+	public static void main(String argp[]) throws BadPaddingException {
 		// testing
-		String plain = "12345678";
-		String key = "hahahaha";
+		String plain = "hahahaha";
+		String key = "hahahah";
 		DESEncoder d = new DESEncoder(key);
 		String encrypt = d.encrypt(plain);
 		String decrypt = d.decrypt(encrypt);
@@ -78,6 +86,6 @@ public class DESEncoder {
 		System.out.println("plain: " + plain);
 		System.out.println("key: " + key);
 		System.out.println("encrypt: " + encrypt);
-		System.out.println("decrypt: " + decrypt);
+		System.out.println("decrypt: " + decrypt);		
 	}
 }
