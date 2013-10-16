@@ -48,6 +48,7 @@ public class MyVPN implements Runnable {
 	public static boolean isConButPressed = false;
 	public static DESEncoder encoder = null;
 	public static DESEncoder encoderMessage = null;
+	public final static String END_CHAT_SESSION = new Character((char) 0).toString();
 
 	// TCP components
 	public static ServerSocket hostServer = null;
@@ -319,8 +320,13 @@ public class MyVPN implements Runnable {
 	}
 
 	public static void terminate(String msg) {
+		try {
+			out.print(END_CHAT_SESSION);
+			out.flush();
+		}
+		catch (Exception e) {}
 		JOptionPane.showMessageDialog(null, msg);
-		mainFrame.setVisible(false);
+		mainFrame.setVisible(false);		
 		System.exit(0);
 	}
 
@@ -405,7 +411,7 @@ public class MyVPN implements Runnable {
 			if(isHost){
 				//if it is a server
 				//stage one for server
-				logArea.append("AuthenticationStage-Server\n");
+				logArea.append("AuthenticationStage-Server\n\n");
 				//wait to verify a client
 				while(!hasChallenge_FromClient)
 				{
@@ -414,7 +420,7 @@ public class MyVPN implements Runnable {
 					if(i == 1){
 						hasChallenge_FromClient = true;
 						logArea.append("Challenge String Received from Client\n");
-						logArea.append("Challenge String: "+ clientChallengeReceived + "\n");
+						logArea.append("Challenge String: "+ clientChallengeReceived + "\n\n");
 					}
 					i++;
 				}
@@ -441,7 +447,7 @@ public class MyVPN implements Runnable {
 					encryptedAuthenStringClient = readAuthenticationMessage();
 					hasAuthenString_FromClient = true;
 					logArea.append("Received the encrypted authentication string from the client\n");
-					logArea.append("The encrypted authentication string is: " + encryptedAuthenStringClient + "\n");
+					logArea.append("The encrypted authentication string is: " + encryptedAuthenStringClient + "\n\n");
 				}
 				waitForContinue();
 				//decrypted the authentication string and verify the client's identity
@@ -449,13 +455,13 @@ public class MyVPN implements Runnable {
 					terminate("Fail to verify the client, the program is terminated...");
 				}
 				else{
-					logArea.append("The client's identity is successfully verified...\n");
+					logArea.append("The client's identity is successfully verified!!\n\n");
 				}
 			}
 			else {
 				//if it is a client
 				//stage one for client
-				logArea.append("AuthenticationStage-Client\n");
+				logArea.append("AuthenticationStage-Client\n\n");
 				//send out first message to claim the client's identity
 				//this string may vary...
 				waitForContinue();
@@ -467,7 +473,7 @@ public class MyVPN implements Runnable {
 				//send out the challenge word to the server
 				//the Client's Challenge can be changed
 				sendAuthenticationMessage(clientChallengeSent);
-				logArea.append("First Authentication Message Sent\n");
+				logArea.append("First Authentication Message Sent\n\n");
 
 				//stage two for client
 				//waiting for the encrypted authentication string from the server
@@ -475,13 +481,13 @@ public class MyVPN implements Runnable {
 					encryptedAuthenStringServer = readAuthenticationMessage();
 					hasAuthenString_FromServer = true;
 					logArea.append("Received the encrypted authentication string from the server\n");
-					logArea.append("The encrypted authentication string is :" + encryptedAuthenStringServer + "\n");
+					logArea.append("The encrypted authentication string is :" + encryptedAuthenStringServer + "\n\n");
 				}
 				while(!hasChallenge_FromServer){
 					serverChallengeReceived = readAuthenticationMessage();
 					hasChallenge_FromServer = true;
 					logArea.append("Received the challenge string from the server\n");
-					logArea.append("The challenge string is :" + serverChallengeReceived + "\n");
+					logArea.append("The challenge string is :" + serverChallengeReceived + "\n\n");
 
 				}
 				
@@ -496,7 +502,7 @@ public class MyVPN implements Runnable {
 				//stage three for client
 				//generate a encrypted authentication string to the server
 				sendAuthenticationMessage(encoder.encrypt(XORencode(clientID,serverChallengeReceived)));
-				logArea.append("The server's identity is successfully verified...\n");
+				logArea.append("The server's identity is successfully verified!!\n\n");
 			}
 		}
 		catch(BadPaddingException e) {
@@ -649,32 +655,16 @@ public class MyVPN implements Runnable {
 	public static void main(String args[]) throws IOException {
 		initGUI();
 
-		int prevStatus = -1;
-		while(true) {		
-			prevStatus = status;
-			if(status == DISCONNECTED) {
-				doDisconnected();
-			}
-			else if(status == CREATINGSERVER) {
-				encoder = new DESEncoder(pinField.getText());
-//				encoderMessage = new DESEncoder(Integer.toString(keyGenerator()));
-//				encoderMessage = new DESEncoder(pinField.getText());
-				creatServer();
-				status = AUTHENTICATING;
-				try {
-					in = new BufferedReader(new 
-							InputStreamReader(socket.getInputStream()));
-					out = new PrintWriter(socket.getOutputStream(), true);
-				} catch (IOException e) {
-					e.printStackTrace();	
+		try {
+			int prevStatus = -1;
+			while(true) {	
+				prevStatus = status;
+				if(status == DISCONNECTED) {
+					doDisconnected();
 				}
-			}
-			else if(status == WAITINGSERVER) {
-				encoder = new DESEncoder(pinField.getText());
-//				encoderMessage = new DESEncoder(Integer.toString(keyGenerator()));
-//				encoderMessage = new DESEncoder(pinField.getText());
-				if(connectAsClient()) {
-					logArea.append("Client: Connected to server\n");
+				else if(status == CREATINGSERVER) {
+					encoder = new DESEncoder(pinField.getText());
+					creatServer();
 					status = AUTHENTICATING;
 					try {
 						in = new BufferedReader(new 
@@ -684,33 +674,50 @@ public class MyVPN implements Runnable {
 						e.printStackTrace();	
 					}
 				}
-				else {
-					logArea.append("Client: Could not connect\n");
-					status = DISCONNECTED;
+				else if(status == WAITINGSERVER) {
+					encoder = new DESEncoder(pinField.getText());
+					if(connectAsClient()) {
+						logArea.append("Client: Connected to server\n");
+						status = AUTHENTICATING;
+						try {
+							in = new BufferedReader(new 
+									InputStreamReader(socket.getInputStream()));
+							out = new PrintWriter(socket.getOutputStream(), true);
+						} catch (IOException e) {
+							e.printStackTrace();	
+						}
+					}
+					else {
+						logArea.append("Client: Could not connect\n");
+						status = DISCONNECTED;
+					}
 				}
+				else if(status == AUTHENTICATING) {
+					if(isHost)
+						statusLabel.setText("AUTHENTICATING - Server side");
+					else
+						statusLabel.setText("AUTHENTICATING - Client side");
+					mainFrame.repaint();
+					doAuthentication(isHost);
+					status = CONNECTED;
+					if(isHost)
+						statusLabel.setText("I am Server(Bob)!");
+					else
+						statusLabel.setText("I am Client(Alice)!");
+				}
+				else if(status == CONNECTED) {
+					String msg = readMessage();
+					if(msg != null && msg.length() != 0) 
+						logArea.append("IN:" + msg + "\n");
+						logArea.setCaretPosition(logArea.getDocument().getLength());
+				}
+	
+				if(prevStatus != status)
+					myVPN.run();
 			}
-			else if(status == AUTHENTICATING) {
-				if(isHost)
-					statusLabel.setText("AUTHENTICATING - Server side");
-				else
-					statusLabel.setText("AUTHENTICATING - Client side");
-				mainFrame.repaint();
-				doAuthentication(isHost);
-				status = CONNECTED;
-				if(isHost)
-					statusLabel.setText("I am Server(Bob)!");
-				else
-					statusLabel.setText("I am Client(Alice)!");
-			}
-			else if(status == CONNECTED) {
-				String msg = readMessage();
-				if(msg != null && msg.length() != 0) 
-					logArea.append("IN:" + msg + "\n");
-					logArea.setCaretPosition(logArea.getDocument().getLength());
-			}
-
-			if(prevStatus != status)
-				myVPN.run();
+		} 
+		catch(Exception e) {
+			terminate("Disconnected");
 		}
 	}
 }
