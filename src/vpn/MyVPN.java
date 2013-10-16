@@ -33,7 +33,8 @@ public class MyVPN implements Runnable {
 
 	public static final String HOSTIP = "127.0.0.1";
 	public static final int DEFAULTPORT = 7777;
-	public static final String key = "hahahaha";
+	public static String DEFAULTKEY = "hahahaha";
+	public static final int KEYSIZE = 8;
 	public static final int TEXTFIELDSIZE = 15;
 	public static final int FRAME_HEIGHT = 500;
 	public static final int FRAME_WIDTH = 800;
@@ -47,7 +48,6 @@ public class MyVPN implements Runnable {
 	public static boolean isConButPressed = false;
 	public static DESEncoder encoder = null;
 	public static DESEncoder encoderMessage = null;
-	public static final int KEYSIZE = 8;
 
 	// TCP components
 	public static ServerSocket hostServer = null;
@@ -72,8 +72,7 @@ public class MyVPN implements Runnable {
 	public static JButton clientButton;
 	public static JButton disconnectButton;
 	public static JLabel statusLabel;
-
-	//public static ActionAdapter getButtonListener()
+	
 	public static void initPanel() {
 
 		// set up log panel
@@ -104,7 +103,8 @@ public class MyVPN implements Runnable {
 		logArea.setWrapStyleWord(true);
 		logArea.setEditable(false);
 		logArea.setRows(20);
-		scrollingTextArea = new JScrollPane(logArea);
+		scrollingTextArea = new JScrollPane(logArea, JScrollPane.VERTICAL_SCROLLBAR_ALWAYS,
+		         JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
 
 		JPanel sendPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
 		sendPanel.add(sendDataField);
@@ -112,9 +112,7 @@ public class MyVPN implements Runnable {
 		logPanel.add(sendPanel, BorderLayout.NORTH);
 		logPanel.add(scrollingTextArea, BorderLayout.CENTER);
 
-		//-------------------------------------------------------------
 		// set up option panel
-		//-------------------------------------------------------------
 		optPanel = new JPanel(new GridLayout(7, 1));
 
 		// IP panel
@@ -137,7 +135,7 @@ public class MyVPN implements Runnable {
 		JPanel pinPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
 		pinPanel.add(new JLabel("Shared key:"));
 		pinField = new JTextField(TEXTFIELDSIZE); 
-		pinField.setText(key);
+		pinField.setText(DEFAULTKEY);
 		pinPanel.add(pinField);
 		optPanel.add(pinPanel);
 
@@ -239,9 +237,7 @@ public class MyVPN implements Runnable {
 		buttonPanel2.add(contButton);
 		optPanel.add(buttonPanel2);
 
-		//-------------------------------------------------------------
 		// set up the main panel
-		//-------------------------------------------------------------
 		panel = new JPanel();
 		panel.setLayout(new BorderLayout());
 		panel.add(logPanel, BorderLayout.CENTER);
@@ -343,6 +339,7 @@ public class MyVPN implements Runnable {
 		out.print(mac + "\n");
 		out.flush();
 		logArea.append("OUT(HMAC): " + mac + "\n");
+		logArea.setCaretPosition(logArea.getDocument().getLength());
 	}
 
 	public static void sendAuthenticationMessage(String msg){
@@ -431,6 +428,8 @@ public class MyVPN implements Runnable {
 
 				//Generate a random string for challenge
 				serverChallengeSent = randomStringGenerator();
+				
+				encoderMessage = new DESEncoder(keyGenerator(serverChallengeSent));
 
 				//send out a challenge string
 				//the server's challenge can be changed
@@ -485,6 +484,9 @@ public class MyVPN implements Runnable {
 					logArea.append("The challenge string is :" + serverChallengeReceived + "\n");
 
 				}
+				
+				encoderMessage = new DESEncoder(keyGenerator(serverChallengeReceived));
+				
 				waitForContinue();
 				//decrypte the authentication string and verify the server's identity
 				if(!(XORdecode(encoder.decrypt(encryptedAuthenStringServer), clientChallengeSent).equals(serverID))){
@@ -531,7 +533,13 @@ public class MyVPN implements Runnable {
 		String result = randomString.toString();
 		return result;
 	}
-
+	
+	public static String keyGenerator(String str) {
+		String key = getMAC(str);
+		key = key.substring(0, KEYSIZE);
+		return key;
+	}
+	
 	//Ben key generator
 	public static int keyGenerator(){
 		int result = 0;
@@ -540,8 +548,9 @@ public class MyVPN implements Runnable {
 		int max = 101; //exclusive
 		int a = r.nextInt(max - min) + min;
 		int b = r.nextInt(max - min) + min;
+		String key = pinField.getText();
 		int keyhash = key.hashCode();
-		result = (int) (((Math.pow(a,b))%keyhash)*8);
+		result = (int) (((Math.pow(a, b))%keyhash)*8);
 		return result;
 	}
 
@@ -649,7 +658,7 @@ public class MyVPN implements Runnable {
 			else if(status == CREATINGSERVER) {
 				encoder = new DESEncoder(pinField.getText());
 //				encoderMessage = new DESEncoder(Integer.toString(keyGenerator()));
-				encoderMessage = new DESEncoder(pinField.getText());
+//				encoderMessage = new DESEncoder(pinField.getText());
 				creatServer();
 				status = AUTHENTICATING;
 				try {
@@ -663,7 +672,7 @@ public class MyVPN implements Runnable {
 			else if(status == WAITINGSERVER) {
 				encoder = new DESEncoder(pinField.getText());
 //				encoderMessage = new DESEncoder(Integer.toString(keyGenerator()));
-				encoderMessage = new DESEncoder(pinField.getText());
+//				encoderMessage = new DESEncoder(pinField.getText());
 				if(connectAsClient()) {
 					logArea.append("Client: Connected to server\n");
 					status = AUTHENTICATING;
@@ -696,7 +705,8 @@ public class MyVPN implements Runnable {
 			else if(status == CONNECTED) {
 				String msg = readMessage();
 				if(msg != null && msg.length() != 0) 
-					logArea.append("IN:" + msg + "\n");	
+					logArea.append("IN:" + msg + "\n");
+					logArea.setCaretPosition(logArea.getDocument().getLength());
 			}
 
 			if(prevStatus != status)
